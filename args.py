@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--multicore', type=int, default=0, help='whether we use multiprocessing or not in test')
     parser.add_argument('--pretrain', type=int, default=0, help='whether we use pretrained weight or not')
-    parser.add_argument('--seed', type=int, default=2020, help='random seed')
+    parser.add_argument('--seed', type=int, default=2023, help='random seed')
     parser.add_argument('--model', type=str, default='lmse', help='rec-model, support [mf, lgn, lmse]')
     parser.add_argument('--mse', type=int, default=1, help='Use MSELoss or not, affects mf only, lgn uses bpr, lmse must use MSELoss')
     parser.add_argument('--sigmoid', type=int, default=1, help='whether we use sigmoid activation, support [mf(with mse=1), lmse]')
@@ -66,6 +66,7 @@ LAYER: int = __args.layer
 EPOCHS: int = __args.epochs
 DECAY: float = __args.decay
 TOPKS: list[int] = eval(__args.topks)
+SEED: int = __args.seed
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -78,5 +79,6 @@ LAYER: {LAYER}
 EPOCHS: {EPOCHS}
 DECAY: {DECAY}
 TOPKS: {TOPKS}
+SEED: {SEED}
 """)
 print()

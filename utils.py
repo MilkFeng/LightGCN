@@ -2,10 +2,10 @@
 一些工具函数
 """
 import numpy as np
+import torch
 
 import args
 from dataset import BasicDataset
-
 
 def sample(dataset: BasicDataset):
     """
@@ -49,6 +49,7 @@ def sample(dataset: BasicDataset):
 
     return np.array(samples)
 
+
 def shuffle(*arrays, **kwargs):
     """
     打乱
@@ -88,3 +89,14 @@ def minibatch(*tensors, **kwargs):
     else:
         for i in range(0, len(tensors[0]), batch_size):
             yield tuple(x[i:i + batch_size] for x in tensors)
+
+
+def set_seed(seed):
+    np.random.seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    torch.manual_seed(seed)
+
+
+set_seed(args.SEED)
