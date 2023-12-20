@@ -17,6 +17,16 @@ class Edge(object):
     def __str__(self):
         return f"Edge(user={self.user}, item={self.item}, rating={self.rating})"
 
+    def __getitem__(self, item):
+        if item == 0:
+            return self.user
+        elif item == 1:
+            return self.item
+        elif item == 2:
+            return self.rating
+        else:
+            raise IndexError("Edge index out of range")
+
 class Data(object):
     """
     数据，存储所有边和邻接矩阵
@@ -34,13 +44,14 @@ class Data(object):
         :param edges: 所有边
         :param graph: 邻接矩阵
         """
-        self.__user_num = user_num
-        self.__item_num = item_num
-
         self.edges = edges
         self.edge_num = len(self.edges)
 
         self.users: list[int] = list(set([edge.user for edge in edges]))
+
+        self.edges_of_users = {user: set() for user in range(user_num)}
+        for edge in edges:
+            self.edges_of_users[edge.user].add(edge)
 
         # |I,   R|
         # |R^T, I|
@@ -69,18 +80,26 @@ class Data(object):
     def get_liked_items(self, user: int) -> set[int]:
         """
         获得喜欢的物品
-        :param user: 用户
-        :return:
         """
-        return set([edge.item for edge in self.edges if edge.user == user])
+        return set([edge.item for edge in self.edges_of_users[user]])
 
     def get_liked_items_of_users(self, users: list[int]) -> list[set[int]]:
         """
         获得喜欢的物品
-        :param users: 用户列表
-        :return:
         """
         return [self.get_liked_items(user) for user in users]
+
+    def get_liked_items_with_rating(self, user: int) -> set[tuple[int, float]]:
+        """
+        获得喜欢的物品和评分
+        """
+        return set([(edge.item, edge.rating) for edge in self.edges_of_users[user]])
+
+    def get_liked_items_with_rating_of_users(self, users: list[int]) -> list[set[tuple[int, float]]]:
+        """
+        获得喜欢的物品和评分
+        """
+        return [self.get_liked_items_with_rating(user) for user in users]
 
     def __str__(self):
         return f"Data(edges={self.edges}, graph={self.graph})"

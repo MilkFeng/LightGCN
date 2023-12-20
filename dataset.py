@@ -49,9 +49,9 @@ class BasicDataset(ABC):
         """
         pass
 
+
 class MoveLens(BasicDataset):
     def __init__(self, path: str = 'data/modcloth/', filename: str = 'ratings.csv', max_rating: float = 5.0):
-
         self.max_rating = max_rating
 
         # 读取数据并去除空值
@@ -71,10 +71,6 @@ class MoveLens(BasicDataset):
         train_users, test_users = train_test_split(users, test_size=0.2)
         train_data = dataset[dataset['userId'].isin(train_users)]
         test_data = dataset[dataset['userId'].isin(test_users)]
-
-        # 保存数据集
-        train_data.to_csv(path + 'train.csv')
-        test_data.to_csv(path + 'test.csv')
 
         # 解析数据
         self.__train_data = self.__decode_data(train_data).to(args.DEVICE)
@@ -149,3 +145,28 @@ class MoveLens(BasicDataset):
 
     def __str__(self):
         return f"MoveLens(train_data={self.train_data}, test_data={self.test_data})"
+
+
+def load_dataset(name: str) -> BasicDataset:
+    all_dataset = ['indonesia_tourism', 'ml-latest-small', 'modcloth']
+
+    if name == 'indonesia_tourism':
+        return MoveLens(
+            path='data/indonesia_tourism/',
+            filename='tourism_rating.csv',
+            max_rating=5.0
+        )
+    elif name == 'ml-latest-small':
+        return MoveLens(
+            path='data/ml-latest-small/',
+            filename='ratings.csv',
+            max_rating=5.0
+        )
+    elif name == 'modcloth':
+        return MoveLens(
+            path='data/modcloth/',
+            filename='ratings.csv',
+            max_rating=5.0
+        )
+    else:
+        raise NotImplementedError(f"Haven't supported {name} yet!, try {all_dataset}")

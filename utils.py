@@ -7,11 +7,12 @@ import torch
 import args
 from dataset import BasicDataset
 
-def sample(dataset: BasicDataset):
+
+def sample(dataset: BasicDataset) -> np.ndarray:
     """
     加权负采样
     :param dataset: 数据集
-    :return: 采样结果
+    :return: 采样结果，[[user, item, rating], ...]
     """
 
     data = dataset.train_data
@@ -22,9 +23,15 @@ def sample(dataset: BasicDataset):
             items_dict[e.user] = []
         items_dict[e.user].append((e.item, e.rating))
 
+    # 采样用户
+    users = data.users
+
+    # 获取用户喜欢的物品以及评分
+    liked_items_with_rating = data.get_liked_items_with_rating_of_users(users)
+
     samples = []
-    for user in data.users:
-        items = items_dict.get(user, [])
+    for i, user in enumerate(users):
+        items = liked_items_with_rating[i]
         if len(items) == 0:
             continue
 
@@ -46,6 +53,42 @@ def sample(dataset: BasicDataset):
         samples.append([user, items[pos_item_index], ratings[pos_item_index]])
         if neg_item_index != pos_item_index:
             samples.append([user, items[neg_item_index], ratings[neg_item_index]])
+
+    return np.array(samples)
+
+
+def bpr_sample(dataset: BasicDataset) -> np.ndarray:
+    """
+    BPR 负采样
+    :param dataset: 数据集
+    :return: 采样结果，[[user, pos_item, neg_item], ...]
+    """
+
+    data = dataset.train_data
+
+    # 采样用户
+    users = data.users
+
+    # 获取用户喜欢的物品
+    liked_items = data.get_liked_items_of_users(users)
+
+    samples = []
+    for i, user in enumerate(users):
+        # 获取用户喜欢的物品
+        pos_items = list(liked_items[i])
+
+        if len(pos_items) == 0:
+            continue
+
+        # 采样正样本
+        pos_item = np.random.choice(pos_items)
+
+        # 采样负样本
+        neg_item = np.random.randint(dataset.item_num)
+        while neg_item in pos_items:
+            neg_item = np.random.randint(dataset.item_num)
+
+        samples.append([user, pos_item, neg_item])
 
     return np.array(samples)
 
@@ -80,7 +123,7 @@ def minibatch(*tensors, **kwargs):
     生成 mini-batch
     """
 
-    batch_size = kwargs.get('batch_size', args.BPR_BATCH_SIZE)
+    batch_size = kwargs.get('batch_size', args.BATCH_SIZE)
 
     if len(tensors) == 1:
         tensor = tensors[0]

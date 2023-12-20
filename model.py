@@ -37,8 +37,7 @@ class LightGCN(nn.Module):
         # Sigmoid 激活函数
         self.sigmoid = nn.Sigmoid()
 
-        print(f"""model loaded
-        """)
+        print(f'model loaded')
 
     def propagate(self):
         """
@@ -75,7 +74,30 @@ class LightGCN(nn.Module):
 
         return users.to(args.DEVICE), items.to(args.DEVICE)
 
-    def mse_loss(self, users: list[int], items: list[int], actual_score):
+    def get_rating(self, users: list[int]):
+        """
+        获取分数
+        """
+
+        # 获取 LGC 的嵌入向量
+        all_users, all_items = self.propagate()
+
+        users_emb = all_users[users]
+        items_emb = all_items
+
+        ratings = torch.matmul(users_emb, items_emb.t())
+        if args.SIGMOID:
+            ratings = self.sigmoid(ratings)
+        if args.CLIP:
+            ratings = torch.clip(ratings, 0., 1.)
+        return ratings
+
+    def mse_loss(
+            self,
+            users: list[int] | torch.Tensor,
+            items: list[int] | torch.Tensor,
+            actual_score: torch.Tensor
+    ) -> tuple[torch.Tensor, float]:
         """
         计算 MSE 损失
         """
@@ -95,7 +117,8 @@ class LightGCN(nn.Module):
         # 计算评分
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
-        gamma = self.sigmoid(gamma)
+        if args.SIGMOID:
+            gamma = self.sigmoid(gamma)
 
         # 计算损失
         mse_loss = nn.MSELoss()
@@ -103,20 +126,39 @@ class LightGCN(nn.Module):
 
         return loss, reg_loss
 
-    def get_rating(self, users: list[int]):
+    def bpr_loss(
+            self,
+            users: list[int] | torch.Tensor,
+            pos: list[int] | torch.Tensor,
+            neg: list[int] | torch.Tensor
+    ) -> tuple[torch.Tensor, float]:
         """
-        获取分数
+        计算 BPR 损失
         """
 
         # 获取 LGC 的嵌入向量
         all_users, all_items = self.propagate()
 
-        users_emb = all_users[users]
-        items_emb = all_items
+        # 获取最终的嵌入向量
+        users_emb_ego = self.user_embeddings(users)
+        pos_emb_ego = self.item_embeddings(pos)
+        neg_emb_ego = self.item_embeddings(neg)
 
-        ratings = torch.matmul(users_emb, items_emb.t())
-        ratings = self.sigmoid(ratings)
-        return ratings
+        users_emb = all_users[users]
+        pos_emb = all_items[pos]
+        neg_emb = all_items[neg]
+
+        # 计算正则化损失
+        reg_loss = 0.5 * (users_emb_ego.norm(2).pow(2) + pos_emb_ego.norm(2).pow(2) + neg_emb_ego.norm(2).pow(2)) / float(len(users))
+
+        # 计算评分
+        pos_scores = torch.sum(torch.mul(users_emb, pos_emb), dim=1)
+        neg_scores = torch.sum(torch.mul(users_emb, neg_emb), dim=1)
+
+        # 计算损失
+        bpr_loss = torch.mean(torch.nn.functional.softplus(neg_scores - pos_scores))
+
+        return bpr_loss, reg_loss
 
     def forward(self, users: list[int], items: list[int]):
         """
@@ -133,5 +175,6 @@ class LightGCN(nn.Module):
         # 计算评分
         inner_pro = torch.mul(users_emb, items_emb)
         gamma = torch.sum(inner_pro, dim=1)
-        gamma = self.sigmoid(gamma)
+        if args.SIGMOID:
+            gamma = self.sigmoid(gamma)
         return gamma

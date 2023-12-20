@@ -25,3 +25,22 @@ class MSELoss:
         self.opt.step()
 
         return loss.cpu().item()
+
+
+class BPRLoss:
+    def __init__(self, model: LightGCN):
+        self.model = model
+        self.weight_decay = args.DECAY
+        self.lr = args.LR
+        self.opt = optim.Adam(model.parameters(), lr=self.lr)
+
+    def stageOne(self, users: list[int], pos: list[int], neg: list[int]):
+        loss, reg_loss = self.model.bpr_loss(users, pos, neg)
+        reg_loss = reg_loss * self.weight_decay
+        loss = loss + reg_loss
+
+        self.opt.zero_grad()
+        loss.backward()
+        self.opt.step()
+
+        return loss.cpu().item()
