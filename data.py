@@ -135,8 +135,6 @@ class Data(object):
         data = torch.Tensor(coo.data).float()
         graph = torch.sparse_coo_tensor(index, data, torch.Size(coo.shape))
 
-        print(graph)
-
         return graph
 
     def __str__(self):
