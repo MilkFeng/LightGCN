@@ -93,39 +93,10 @@ class MoveLens(BasicDataset):
         # 除以最大的评分
         ratings: list[float] = [rating / self.max_rating for rating in ratings]
 
-        # 生成邻接矩阵
-        graph = sp.dok_matrix((self.user_num + self.item_num, self.user_num + self.item_num), dtype=np.float32)
-        graph = graph.tolil()
-
-        R = sp.dok_matrix((self.user_num, self.item_num), dtype=np.float32)
-        for u, i, r in zip(users, items, ratings):
-            R[u, i] = r
-        R = R.tolil()
-
-        graph[:self.user_num, self.user_num:] = R
-        graph[self.user_num:, :self.user_num] = R.T
-
-        # 生成度矩阵
-        rowsum = np.array(graph.sum(axis=1))
-        degree_inv = np.power(rowsum, -0.5).flatten()
-        degree_inv[np.isinf(degree_inv)] = 0.
-        degree_mat = sp.diags(degree_inv)
-
-        # 归一化邻接矩阵
-        graph = degree_mat.dot(graph).dot(degree_mat).tocsr()
-
-        # 转化为 tensor
-        coo = graph.tocoo().astype(np.float32)
-        row = torch.Tensor(coo.row).long()
-        col = torch.Tensor(coo.col).long()
-        index = torch.stack([row, col])
-        data = torch.Tensor(coo.data)
-        graph = torch.sparse.FloatTensor(index, data, torch.Size(coo.shape))
-
         # 所有边
         edges = [Edge(u, i, r) for u, i, r in zip(users, items, ratings)]
 
-        return Data(self.__user_num, self.__item_num, edges, graph).to(args.DEVICE)
+        return Data(self.__user_num, self.__item_num, edges).to(args.DEVICE)
 
     @property
     def train_data(self) -> Data:
