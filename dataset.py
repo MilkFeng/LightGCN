@@ -5,10 +5,7 @@ BasicDataset 并实现方法
 
 from abc import ABC, abstractmethod
 
-import numpy as np
 import pandas as pd
-import scipy.sparse as sp
-import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
@@ -50,7 +47,7 @@ class BasicDataset(ABC):
         pass
 
 
-class MoveLens(BasicDataset):
+class MovieLens(BasicDataset):
     def __init__(self, path: str = 'data/modcloth/', filename: str = 'ratings.csv', max_rating: float = 5.0):
         self.max_rating = max_rating
 
@@ -76,7 +73,7 @@ class MoveLens(BasicDataset):
         self.__train_data = self.__decode_data(train_data).to(args.DEVICE)
         self.__test_data = self.__decode_data(test_data).to(args.DEVICE)
 
-        print(f"MoveLens Dataset loaded\n"
+        print(f"MovieLens Dataset loaded\n"
               f"path: {path}\n"
               f"filename: {filename}\n"
               f"max_rating: {max_rating}\n"
@@ -122,19 +119,19 @@ def load_dataset(name: str) -> BasicDataset:
     all_dataset = ['indonesia_tourism', 'ml-latest-small', 'modcloth']
 
     if name == 'indonesia_tourism':
-        return MoveLens(
+        return MovieLens(
             path='data/indonesia_tourism/',
             filename='tourism_rating.csv',
             max_rating=5.0
         )
     elif name == 'ml-latest-small':
-        return MoveLens(
+        return MovieLens(
             path='data/ml-latest-small/',
             filename='ratings.csv',
             max_rating=5.0
         )
     elif name == 'modcloth':
-        return MoveLens(
+        return MovieLens(
             path='data/modcloth/',
             filename='ratings.csv',
             max_rating=5.0

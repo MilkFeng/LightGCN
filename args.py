@@ -36,7 +36,7 @@ def parse_args():
     # parser.add_argument('--comment', type=str, default="lgn")
     # parser.add_argument('--load', type=int, default=0)
 
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=300)
 
     # parser.add_argument('--multicore', type=int, default=0, help='whether we use multiprocessing or not in test')
     # parser.add_argument('--pretrain', type=int, default=0, help='whether we use pretrained weight or not')
@@ -46,8 +46,8 @@ def parse_args():
     # parser.add_argument('--model', type=str, default='lmse', help='rec-model, support [mf, lgn, lmse]')
 
     parser.add_argument('--mse', type=int, default=0, help='Use MSELoss or not')
-    parser.add_argument('--sigmoid', type=int, default=1, help='whether we use sigmoid activation')
-    parser.add_argument('--clip', type=int, default=0, help='whether we clip output between 0-1')
+    parser.add_argument('--sigmoid', type=int, default=0, help='whether we use sigmoid activation')
+    parser.add_argument('--clip', type=int, default=1, help='whether we clip output between 0-1')
 
     return parser.parse_args()
 
@@ -82,14 +82,15 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 __root_path = os.path.dirname(__file__)
 ROOT_FILE_PATH = os.path.join(__root_path, 'runs')
-CURRENT_FILE_PATH = os.path.join(ROOT_FILE_PATH, f'{DATASET_NAME}-{TIMESTAMP}')
+CURRENT_FILE_PATH = os.path.join(ROOT_FILE_PATH, f'{TIMESTAMP}-{DATASET_NAME}')
 
 if not os.path.exists(ROOT_FILE_PATH):
     os.makedirs(ROOT_FILE_PATH, exist_ok=True)
 if not os.path.exists(CURRENT_FILE_PATH):
     os.makedirs(CURRENT_FILE_PATH, exist_ok=True)
 
-print(f"""TIMESTAMP: {TIMESTAMP}
+
+__str = f"""TIMESTAMP: {TIMESTAMP}
 DATASET_NAME: {DATASET_NAME}
 REC_DIM: {REC_DIM}
 BPR_BATCH_SIZE: {BATCH_SIZE}
@@ -100,11 +101,17 @@ EPOCHS: {EPOCHS}
 DECAY: {DECAY}
 TOPK: {TOPK}
 SEED: {SEED}
-SIGMOID: {SIGMOID}
 MSE: {MSE}
+SIGMOID: {SIGMOID}
 CLIP: {CLIP}
 DEVICE: {DEVICE}
 
 CURRENT_FILE_PATH: {CURRENT_FILE_PATH}
-""")
+"""
+
+with open(os.path.join(CURRENT_FILE_PATH, "args.txt"), mode='w') as f:
+    f.write(__str)
+    f.close()
+
+print(__str)
 print()

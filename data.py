@@ -102,7 +102,10 @@ class Data(object):
         return [self.get_liked_items_with_rating(user) for user in users]
 
     def __get_graph(self, user_num: int, item_num: int) -> torch.Tensor:
-        # 生成邻接矩阵
+        """
+        生成归一化的邻接矩阵
+        """
+
         graph = sp.dok_matrix((user_num + item_num, user_num + item_num), dtype=np.float32)
         graph = graph.tolil()
 
@@ -111,27 +114,23 @@ class Data(object):
             R[u, i] = r
         R = R.tolil()
 
-        # |I,   R|
-        # |R^T, I|
-        graph[:user_num, :user_num] = torch.eye(user_num)
-        graph[user_num:, user_num:] = torch.eye(item_num)
+        # |0,   R|
+        # |R^T, 0|
         graph[:user_num, user_num:] = R
         graph[user_num:, :user_num] = R.T
 
         # 生成度矩阵
-        rowsum = np.array(graph.sum(axis=1))
-        degree_inv = np.power(rowsum, -0.5).flatten()
+        row_sum = np.array(graph.sum(axis=1))
+        degree_inv = np.power(row_sum, -0.5).flatten()
         degree_inv[np.isinf(degree_inv)] = 0.
-        degree_mat = sp.diags(degree_inv)
+        degree_inv_mat = sp.diags(degree_inv)
 
         # 归一化邻接矩阵
-        graph = degree_mat.dot(graph).dot(degree_mat).tocsr()
+        graph = (degree_inv_mat @ graph @ degree_inv_mat).tocsr()
 
         # 转化为 tensor
         coo = graph.tocoo().astype(np.float32)
-        row = torch.Tensor(coo.row).long()
-        col = torch.Tensor(coo.col).long()
-        index = torch.stack([row, col])
+        index = torch.stack([torch.Tensor(coo.row).long(), torch.Tensor(coo.col).long()])
         data = torch.Tensor(coo.data).float()
         graph = torch.sparse_coo_tensor(index, data, torch.Size(coo.shape))
 

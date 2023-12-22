@@ -7,61 +7,11 @@ import torch
 import args
 from dataset import BasicDataset
 
-
 def sample(dataset: BasicDataset) -> np.ndarray:
-    """
-    加权负采样
-    :param dataset: 数据集
-    :return: 采样结果，[[user, item, rating], ...]
-    """
-
-    data = dataset.train_data
-
-    items_dict = {}
-    for e in data.edges:
-        if e.user not in items_dict.keys():
-            items_dict[e.user] = []
-        items_dict[e.user].append((e.item, e.rating))
-
-    # 采样用户
-    users = data.users
-
-    # 获取用户喜欢的物品以及评分
-    liked_items_with_rating = data.get_liked_items_with_rating_of_users(users)
-
-    samples = []
-    for i, user in enumerate(users):
-        items = liked_items_with_rating[i]
-        if len(items) == 0:
-            continue
-
-        # 取评分低的当做负样本
-        ratings = [item[1] for item in items]
-
-        rating_inv_sum = sum([2. - item[1] for item in items])
-        weights_inv = [(2. - item[1]) / rating_inv_sum for item in items]
-
-        rating_sum = sum([item[1] for item in items])
-        weights = [item[1] / rating_sum for item in items]
-
-        items = [item[0] for item in items]
-        items_index = range(len(items))
-
-        neg_item_index = np.random.choice(items_index, p=weights_inv)
-        pos_item_index = np.random.choice(items_index, p=weights)
-
-        samples.append([user, items[pos_item_index], ratings[pos_item_index]])
-        if neg_item_index != pos_item_index:
-            samples.append([user, items[neg_item_index], ratings[neg_item_index]])
-
-    return np.array(samples)
-
-
-def bpr_sample(dataset: BasicDataset) -> np.ndarray:
     """
     BPR 负采样
     :param dataset: 数据集
-    :return: 采样结果，[[user, pos_item, neg_item], ...]
+    :return: 采样结果，[[user, pos_item, neg_item, pos_item_rating], ...]
     """
 
     data = dataset.train_data
@@ -83,12 +33,15 @@ def bpr_sample(dataset: BasicDataset) -> np.ndarray:
         # 采样正样本
         pos_item = np.random.choice(pos_items)
 
+        # 获取正样本评分
+        pos_item_rating = data.get_rating([user])[0, pos_item].cpu().item()
+
         # 采样负样本
         neg_item = np.random.randint(dataset.item_num)
         while neg_item in pos_items:
             neg_item = np.random.randint(dataset.item_num)
 
-        samples.append([user, pos_item, neg_item])
+        samples.append([user, pos_item, neg_item, pos_item_rating])
 
     return np.array(samples)
 

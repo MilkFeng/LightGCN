@@ -6,79 +6,55 @@ import os.path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torch import optim
 from torch.nn.functional import mse_loss
 
 import args
 from dataset import BasicDataset, load_dataset
-from loss import MSELoss, BPRLoss
+from loss import EnhancedBPRLossModule, BasicLossModule
 from model import LightGCN
-from utils import sample, shuffle, minibatch, bpr_sample
+from utils import sample, shuffle, minibatch
 
-
-def train_use_mse(dataset: BasicDataset, model: LightGCN, epoch: int) -> float:
+def train(dataset: BasicDataset, model: LightGCN, loss: BasicLossModule, epoch: int) -> float:
     """
-    使用 MSE Loss 训练 LightGCN 模型
+    使用 Enhanced BPR Loss 训练 LightGCN 模型
     :param dataset: 数据集
     :param model: 模型
+    :param loss: 损失
     :param epoch: 当前 epoch
     :return: loss
     """
 
     model.train()
-    mse = MSELoss(model)
+    opt = optim.Adam(loss.parameters(), lr=args.LR)
 
     # 采样
     samples = sample(dataset)
     users = torch.Tensor(samples[:, 0]).long().to(args.DEVICE)
-    items = torch.Tensor(samples[:, 1]).long().to(args.DEVICE)
-    ratings = torch.Tensor(samples[:, 2]).float().to(args.DEVICE)
-
-    # 打乱
-    users, items, ratings = shuffle(users, items, ratings)
-
-    # 训练
-    total_batch = 0
-    aver_loss = 0.
-    for (batch_i, (batch_users, batch_items, batch_ratings)) in enumerate(minibatch(users, items, ratings, batch_size=args.BATCH_SIZE)):
-        total_batch += 1
-        cri = mse.stageOne(batch_users, batch_items, batch_ratings)
-        aver_loss += cri
-
-    aver_loss = aver_loss / total_batch
-    return aver_loss
-
-
-def train_use_bpr(dataset: BasicDataset, model: LightGCN, epoch: int) -> float:
-    """
-    使用 BPR Loss 训练 LightGCN 模型
-    :param dataset: 数据集
-    :param model: 模型
-    :param epoch: 当前 epoch
-    :return: loss
-    """
-
-    model.train()
-    bpr = BPRLoss(model)
-
-    # 采样
-    samples = bpr_sample(dataset)
-    users = torch.Tensor(samples[:, 0]).long().to(args.DEVICE)
     pos_items = torch.Tensor(samples[:, 1]).long().to(args.DEVICE)
     neg_items = torch.Tensor(samples[:, 2]).long().to(args.DEVICE)
+    actual_scores = torch.Tensor(samples[:, 3]).float().to(args.DEVICE)
 
     # 打乱
-    users, pos_items, neg_items = shuffle(users, pos_items, neg_items)
+    users, pos_items, neg_items, actual_scores = shuffle(users, pos_items, neg_items, actual_scores)
 
     # 训练
     total_batch = 0
     aver_loss = 0.
-    for (batch_i, (batch_users, batch_pos, batch_neg)) in enumerate(minibatch(users, pos_items, neg_items, batch_size=args.BATCH_SIZE)):
+
+    for (batch_i, (batch_users, batch_pos, batch_neg, batch_actual_scores)) in enumerate(minibatch(users, pos_items, neg_items, actual_scores, batch_size=args.BATCH_SIZE)):
         total_batch += 1
-        cri = bpr.stageOne(batch_users, batch_pos, batch_neg)
+
+        # 获取损失
+        cri = loss(batch_users, batch_pos, batch_neg, batch_actual_scores)
         aver_loss += cri
 
+        opt.zero_grad()
+        cri.backward()
+        opt.step()
+
     aver_loss = aver_loss / total_batch
-    return aver_loss
+    return float(aver_loss)
 
 
 def get_rmse(predict_ratings, actual_ratings):
@@ -153,7 +129,7 @@ def test(dataset: BasicDataset, model: LightGCN, epoch: int):
             batch_num += 1
 
             # 计算预测分数
-            predict_ratings = model.get_rating(batch_users)
+            predict_ratings = model.get_ratings(batch_users)
 
             # 实际分数
             actual_ratings = dataset.test_data.get_rating(batch_users)
@@ -180,8 +156,13 @@ def test(dataset: BasicDataset, model: LightGCN, epoch: int):
 def main():
     args.cprint("[LOAD DATASET AND MODEL]")
     dataset = load_dataset(args.DATASET_NAME)
+
     model = LightGCN(dataset)
     model.to(args.DEVICE)
+
+    loss = EnhancedBPRLossModule(model)
+    loss.to(args.DEVICE)
+
     print()
 
     args.cprint("[START TRAIN]")
@@ -194,17 +175,15 @@ def main():
     test_recalls = []
     test_precisions = []
 
-    for epoch in range(args.EPOCHS):
-        # 是否使用 MSE Loss
-        if args.MSE:
-            loss = train_use_mse(dataset, model, epoch)
-        else:
-            loss = train_use_bpr(dataset, model, epoch)
+    for epoch in range(args.EPOCHS + 1):
+        # 训练
+        if epoch > 0:
+            cri = train(dataset, model, loss, epoch)
 
-        train_epochs.append(epoch)
-        train_losses.append(loss)
+            train_epochs.append(epoch)
+            train_losses.append(cri)
 
-        print(f"EPOCH[{epoch}/{args.EPOCHS}] loss: {loss}")
+            print(f"EPOCH[{epoch}/{args.EPOCHS}] loss: {cri}")
 
         # 每 10 个 epoch 测试一次
         if epoch % 10 == 0:
